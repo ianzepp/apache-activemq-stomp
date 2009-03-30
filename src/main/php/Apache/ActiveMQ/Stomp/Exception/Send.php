@@ -27,4 +27,6 @@
  * @package Apache_ActiveMQ_Stomp
  */
 
-class Apache_ActiveMQ_Stomp_Exception_Send extends Apache_ActiveMQ_Exception {}
+require_once "Apache/ActiveMQ/Stomp/Exception.php";
+
+class Apache_ActiveMQ_Stomp_Exception_Send extends Apache_ActiveMQ_Stomp_Exception {}

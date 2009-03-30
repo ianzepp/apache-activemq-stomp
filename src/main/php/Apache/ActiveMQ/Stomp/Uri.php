@@ -27,6 +27,8 @@
  * @package Apache_ActiveMQ_Stomp
  */
 
+require_once "Apache/ActiveMQ/Stomp/Exception.php";
+
 class Apache_ActiveMQ_Stomp_Uri {
 	private $protocol;
 	private $host;
@@ -138,7 +140,7 @@ class Apache_ActiveMQ_Stomp_Uri {
 		}
 		
 		if ($this->getHost () == false) {
-			throw new Apache_ActiveMQ_Exception ("Unable to parse host in uri: " . $uri);
+			throw new Apache_ActiveMQ_Stomp_Exception ("Unable to parse host in uri: " . $uri);
 		}
 		if ($this->getPort () == false) {
 			$this->setPort ("61613");

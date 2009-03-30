@@ -27,47 +27,23 @@
  * @package 
  */
 
+require_once "PHPUnit/Framework.php";
 require_once "Apache/ActiveMQ/Stomp/Connection.php";
 
-class Apache_ActiveMQ_Stomp_ConnectionPool {
-	private $connections = array ();
-	
-	public function registerUri ($uri) {
-		assert (is_string ($uri));
-		
-		if (array_key_exists ($uri, $this->connections))
-			return;
-		
-		$this->connections [$uri] = new Apache_ActiveMQ_Stomp_Connection ();
-		$this->connections [$uri]->setUri ($uri);
-	}
-	
+class Apache_ActiveMQ_Stomp_ConnectionTest extends PHPUnit_Framework_TestCase {
 	/**
 	 * Enter description here...
 	 *
 	 * @return Apache_ActiveMQ_Stomp_Connection
 	 */
-	public function getRandomConnection () {
-		$count = count ($this->connections);
-		return $count ? $this->connections [rand (0, $count - 1)] : null;
+	public function newInstance () {
+		return new Apache_ActiveMQ_Stomp_Connection ();
 	}
 	
 	/**
-	 * Enter description here...
-	 *
-	 * @param string $destination
-	 * @param string $payload
+	 * @expectedException
 	 */
-	public function sendRequest ($destination, $payload) {
-		$connection = $this->getRandomConnection ();
-		
-		if (is_null ($connection))
-			throw new Apache_ActiveMQ_Stomp_Exception_Send ("No connections available");
-		
-		if (!$connection->isConnectionOpen ())
-			$connection->connect ();
-			
-		// Try to send the message
-		$connection->sendRequest ($destination, $payload);
+	public function testDefaultConstructor () {
+		return $this->newInstance ();
 	}
 }

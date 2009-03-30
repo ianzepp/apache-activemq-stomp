@@ -27,5 +27,7 @@
  * @package Apache_ActiveMQ_Stomp
  */
 
+require_once "Apache/ActiveMQ/Stomp/Exception/Read.php";
+
 class Apache_ActiveMQ_Stomp_Exception_ReadTimeout extends Apache_ActiveMQ_Stomp_Exception_Read {}
 

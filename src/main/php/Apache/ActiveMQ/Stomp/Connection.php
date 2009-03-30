@@ -27,6 +27,14 @@
  * @package Apache_ActiveMQ_Stomp
  */
 
+require_once "Apache/ActiveMQ/Stomp/Exception.php";
+require_once "Apache/ActiveMQ/Stomp/Exception/Connect.php";
+require_once "Apache/ActiveMQ/Stomp/Exception/Read.php";
+require_once "Apache/ActiveMQ/Stomp/Exception/ReadTimeout.php";
+require_once "Apache/ActiveMQ/Stomp/Exception/Send.php";
+require_once "Apache/ActiveMQ/Stomp/Frame.php";
+require_once "Apache/ActiveMQ/Stomp/Uri.php";
+
 class Apache_ActiveMQ_Stomp_Connection {
 	/** Acknowledgement Types */
 	const Automatic = "auto";
@@ -349,7 +357,7 @@ class Apache_ActiveMQ_Stomp_Connection {
 		assert (is_string ($command) || is_null ($command));
 		assert (is_string ($payload) || is_null ($payload));
 		
-		$frame = new Apache_ActiveMQ_Stomp_Frame ();
+		$frame = new Apache_ActiveMQ_Stomp_Frame;
 		$frame->setConnection ($this);
 		$frame->setExpiration (strval (time () + $this->getDefaultExpiration ()));
 		

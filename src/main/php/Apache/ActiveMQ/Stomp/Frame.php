@@ -27,6 +27,8 @@
  * @package Apache_ActiveMQ_Stomp
  */
 
+require_once "Apache/ActiveMQ/Stomp/Connection.php";
+
 class Apache_ActiveMQ_Stomp_Frame {
 	/** Command Strings */
 	const Acknowledge = "ACK";
@@ -71,7 +73,10 @@ class Apache_ActiveMQ_Stomp_Frame {
 	private $payload = "";
 	
 	/** Constructor */
-	public function __construct (Apache_ActiveMQ_Stomp_Frame $copy) {
+	public function __construct (Apache_ActiveMQ_Stomp_Frame $copy = null) {
+		if (is_null ($copy))
+			return;
+		
 		$this->connection = $copy->connection;
 		$this->command = $copy->command;
 		$this->headers = $copy->headers;
