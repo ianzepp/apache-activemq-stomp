@@ -24,10 +24,14 @@
  * THE SOFTWARE.
  * 
  * @author Ian Zepp
- * @package 
+ * @package Apache_ActiveMQ_Stomp
  */
 
 class Apache_ActiveMQ_Stomp_Connection {
+	/** Acknowledgement Types */
+	const Automatic = "auto";
+	const Client = "client";
+	
 	/** Observation states */
 	const Disconnected = 0;
 	const Opening = 1;
@@ -36,12 +40,15 @@ class Apache_ActiveMQ_Stomp_Connection {
 	const Established = 4;
 	
 	/** Private variables */
-	private $socket;
-	private $uri;
-	private $receiveBuffer = "";
+	private $acknowledgement = self::Automatic;
 	private $correlatedFrames = array ();
+	private $defaultExpiration = 60;
+	private $receiveBuffer = "";
 	private $receiveSize = 0;
-	private $state;
+	private $receiveTimeout = 1; // seconds
+	private $socket;
+	private $state = self::Disconnected;
+	private $uri;
 	
 	/**
 	 * Enter description here...
@@ -168,6 +175,7 @@ class Apache_ActiveMQ_Stomp_Connection {
 	 *
 	 * @param string $destination
 	 * @param string $payload
+	 * @return string The correlation id of the sent frame.
 	 */
 	public function sendRequest ($destination, $payload) {
 		assert (is_string ($destination));
@@ -177,7 +185,10 @@ class Apache_ActiveMQ_Stomp_Connection {
 		$this->debug ("\t Destination: '{$destination}'");
 		$this->debug ("\t Payload: '{$payload}'");
 		
-		$this->newMessageFrame ($destination, $payload)->send ();
+		$frame = $this->newMessageFrame ($destination, $payload);
+		$frame->setGeneratedCorrelationId ();
+		$frame->send ();
+		return $frame->getCorrelationId ();
 	}
 	
 	/**
@@ -220,14 +231,25 @@ class Apache_ActiveMQ_Stomp_Connection {
 	 * Enter description here...
 	 *
 	 * @param string $correlationId
+	 * @return string
+	 */
+	public function receiveResponse ($correlationId) {
+		return $this->receiveFrame ($correlationId)->getPayload ();
+	}
+	
+	/**
+	 * Enter description here...
+	 *
+	 * @param string $correlationId
 	 * @return Apache_ActiveMQ_Stomp_Frame
 	 */
 	public function receiveFrame ($correlationId = null) {
 		$this->debug ("{$this}::receiveFrame ()");
+		$this->debug ("\t Correlation Id: '{$correlationId}'");
 		
 		// Is there a frame with that correlation id in the correlated queue?
 		if (array_key_exists ($correlationId, $this->correlatedFrames)) {
-			$this->debug ("\t Matched queued frame for correlationId " . $correlationId);
+			$this->debug ("\t Found correlation id in queued frames");
 			
 			$frame = $this->correlatedFrames [$correlationId];
 			unset ($this->correlatedFrames [$correlationId]);
@@ -290,15 +312,30 @@ class Apache_ActiveMQ_Stomp_Connection {
 		$frame = $this->newFrame ();
 		$frame->setFrameData ($frameData);
 		
+		// Debug read frame
+		$this->debug ("\t Read frame successfully:");
+		$this->debug ("\t\t Command: '{$frame->getCommand ()}'");
+		
+		foreach ($frame->getHeaders () as $header => $value)
+			$this->debug ("\t\t Header: '{$header}' => '{$value}'");
+		
+		$this->debug ("\t\t Payload: '{$frame->getPayload ()}'");
+		
 		// Is the this message id we were looking for?
 		$frameCorrelationId = $frame->getCorrelationId ();
 		
 		if ($correlationId && $correlationId != $frameCorrelationId) {
+			$this->debug ("\tFrame doesn't match the desired correlation id, trying again...");
 			$this->correlatedFrames [$frameCorrelationId] = $frame;
 			return $this->receiveFrame ($correlationId); // recurse, try again
-		} else {
-			return $frame;
 		}
+		
+		// Are acknowledgements required?
+		if ($this->isAcknowledgementRequired ())
+			$frame->acknowledge ();
+			
+		// Done.
+		return $frame;
 	}
 	
 	/**
@@ -314,6 +351,7 @@ class Apache_ActiveMQ_Stomp_Connection {
 		
 		$frame = new Apache_ActiveMQ_Stomp_Frame ();
 		$frame->setConnection ($this);
+		$frame->setExpiration (strval (time () + $this->getDefaultExpiration ()));
 		
 		if ($command)
 			$frame->setCommand ($command);
@@ -423,6 +461,15 @@ class Apache_ActiveMQ_Stomp_Connection {
 	 *
 	 * @return bool
 	 */
+	protected function isBufferEmpty () {
+		return empty ($this->receiveBuffer);
+	}
+	
+	/**
+	 * Enter description here...
+	 *
+	 * @return bool
+	 */
 	protected function isBufferLargeEnough () {
 		return $this->receiveSize <= strlen ($this->receiveBuffer);
 	}
@@ -471,7 +518,7 @@ class Apache_ActiveMQ_Stomp_Connection {
 	protected function isSocketReadable () {
 		$receiveSockets [] = $this->socket;
 		$null = null;
-		$readable = socket_select ($receiveSockets, $null, $null, 0);
+		$readable = socket_select ($receiveSockets, $null, $null, $this->getReceiveTimeout ());
 		
 		if ($readable !== 0)
 			return false;
@@ -486,6 +533,61 @@ class Apache_ActiveMQ_Stomp_Connection {
 		// Add to the buffer
 		$this->receiveBuffer += $receivedData;
 		return !empty ($this->receiveBuffer);
+	}
+	
+	/**
+	 * Enter description here...
+	 *
+	 * @return bool
+	 */
+	public function isAcknowledgementRequired () {
+		return $this->getAcknowledgement () == self::Client;
+	}
+	
+	/**
+	 * @return string
+	 */
+	public function getAcknowledgement () {
+		return $this->acknowledgement;
+	}
+	
+	/**
+	 * @param string $acknowledgement
+	 */
+	public function setAcknowledgement ($acknowledgement) {
+		assert ($acknowledgement == self::Automatic || $acknowledgement == self::Client);
+		$this->acknowledgement = $acknowledgement;
+	}
+	
+	/**
+	 * @return integer
+	 */
+	public function getDefaultExpiration () {
+		return $this->defaultExpiration;
+	}
+	
+	/**
+	 * @param integer $defaultExpiration
+	 */
+	public function setDefaultExpiration ($defaultExpiration) {
+		assert (is_integer ($defaultExpiration));
+		$this->defaultExpiration = $defaultExpiration;
+	}
+	
+	/**
+	 * @return integer
+	 */
+	public function getReceiveTimeout () {
+		return $this->receiveTimeout;
+	}
+	
+	/**
+	 * @param integer $receiveTimeout
+	 */
+	public function setReceiveTimeout ($receiveTimeout) {
+		assert (is_integer ($receiveTimeout));
+		assert ($receiveTimeout >= 0 && $receiveTimeout <= PHP_INT_MAX);
+		$this->receiveTimeout = $receiveTimeout;
 	}
 	
 	/**

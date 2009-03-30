@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  * 
  * @author Ian Zepp
- * @package 
+ * @package Apache_ActiveMQ_Stomp
  */
 
 class Apache_ActiveMQ_Stomp_Frame {
@@ -127,7 +127,7 @@ class Apache_ActiveMQ_Stomp_Frame {
 			return; // Only message types get acknowledged
 		
 
-		$frame = new Apache_ActiveMQ_Stomp_Frame ($this->getConnection ());
+		$frame = new self ($this->getConnection ());
 		$frame->setCommand (self::Acknowledge);
 		
 		if ($this->getTransaction () == null)
@@ -225,7 +225,7 @@ class Apache_ActiveMQ_Stomp_Frame {
 	}
 	
 	public function setGeneratedCorrelationId () {
-		$this->setCorrelationId ((string) uniqid (rand (), true));
+		$this->setCorrelationId ($this->generateUuid ());
 	}
 	
 	public function getDestination () {
@@ -336,9 +336,15 @@ class Apache_ActiveMQ_Stomp_Frame {
 		return $this->payload;
 	}
 	
+	public function getPayloadAsXml () {
+		return simplexml_load_string ($this->getPayload ());
+	}
+	
 	public function setPayload ($payload) {
-		assert (is_string ($payload));
-		$this->payload = $payload;
+		if ($payload instanceof SimpleXMLElement)
+			$this->payload = $payload->asXML ();
+		else
+			$this->payload = (string) $payload;
 	}
 	
 	public function getPriority () {
@@ -380,7 +386,7 @@ class Apache_ActiveMQ_Stomp_Frame {
 	}
 	
 	public function setReceiptRequired () {
-		$this->setHeader (self::Receipt, uniqid (rand (), true));
+		$this->setHeader (self::Receipt, $this->generateUuid ());
 	}
 	
 	public function getSelector () {
@@ -414,5 +420,14 @@ class Apache_ActiveMQ_Stomp_Frame {
 		assert (is_string ($user));
 		$this->setHeader (self::UserHeader, $user);
 	}
-
+	
+	public function generateUuid () {
+		$chars = md5 (uniqid (mt_rand (), true));
+		$uuid = substr ($chars, 0, 8) . '-';
+		$uuid .= substr ($chars, 8, 4) . '-';
+		$uuid .= substr ($chars, 12, 4) . '-';
+		$uuid .= substr ($chars, 16, 4) . '-';
+		$uuid .= substr ($chars, 20, 12);
+		return '{' . $uuid . '}';
+	}
 }

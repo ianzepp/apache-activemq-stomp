@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  * 
  * @author Ian Zepp
- * @package 
+ * @package Apache_ActiveMQ_Stomp
  */
 
 class Apache_ActiveMQ_Stomp_Exception extends Exception {}
