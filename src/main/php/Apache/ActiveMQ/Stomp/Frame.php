@@ -28,82 +28,148 @@
  */
 
 class Apache_ActiveMQ_Stomp_Frame {
-	/**
-	 *
-	 * @return string
-	 */
-	public function __toString () {
-		return get_class ($this);
-	}
+	/** Command Strings */
+	const Acknowledge = "ACK";
+	const Connect = "CONNECT";
+	const Connected = "CONNECTED";
+	const Disconnect = "DISCONNECT";
+	const Error = "ERROR";
+	const Message = "MESSAGE";
+	const Receipt = "RECEIPT";
+	const Send = "SEND";
+	const Subscribe = "SUBSCRIBE";
+	const Unsubscribe = "UNSUBSCRIBE";
 	
-	/**
-	 * Command used to determine if a message was send asynchronously ok
-	 */
-	const ASYNC_OK = "ASYNC_OK";
+	/** Header Strings */
+	const AcknowledgedHeader = "ack";
+	const ContentLengthHeader = "content-length";
+	const CorrelationIdHeader = "correlation-id";
+	const DestinationHeader = "destination";
+	const ExpirationHeader = "expiration";
+	const IdHeader = "id";
+	const MessageIdHeader = "message-id";
+	const PasswordHeader = "passcode";
+	const PriorityHeader = "priority";
+	const ReceiptCommandHeader = "receipt-id";
+	const ReceiptHeader = "receipt";
+	const SelectorHeader = "selector";
+	const SubscriptionHeader = "subscription";
+	const TransactionHeader = "transaction";
+	const UserHeader = "login";
 	
-	/**
-	 * Enter description here...
-	 *
-	 */
-	const CORRELATION_ID = "correlation-id";
+	/** Message Priorities */
+	const Lowest = 0;
+	const Low = 1;
+	const Normal = 4;
+	const High = 6;
+	const Highest = 9;
 	
-	/**
-	 * Enter description here...
-	 *
-	 */
-	const CONTENT_LENGTH = "content-length";
-	
-	/**
-	 * Enter description here...
-	 *
-	 */
-	const TERMINATOR = "\x00\n";
-	
-	/**
-	 * @var array
-	 */
+	/** Private variables */
+	private $connection;
+	private $command = "";
 	private $headers = array ();
+	private $payload = "";
+	
+	/** Constructor */
+	public function __construct (Apache_ActiveMQ_Stomp_Frame $copy) {
+		$this->connection = $copy->connection;
+		$this->command = $copy->command;
+		$this->headers = $copy->headers;
+		$this->payload = $copy->payload;
+	}
 	
 	/**
-	 * Enter description here...
-	 *
-	 * @var string
+	 * Convert the frame command, headers, and payload to a flat string for sending.
+	 * 
+	 * @return string 
 	 */
-	private $command = '';
-	
-	/**
-	 * Enter description here...
-	 *
-	 * @var string
-	 */
-	private $body = '';
-	
-	/**
-	 *
-	 */
-	public function __construct ($command = "SEND", $messageBody = '') {
-		assert (is_string ($command));
-		assert (is_string ($messageBody) || is_null ($messageBody));
+	public function toFrame () {
+		$frameData = "";
 		
-		$this->setCommand ($command);
-		$this->setBody ($messageBody);
-		$this->generateCorrelationId ();
-	}
-	/**
-	 * @param string $prefix
-	 */
-	protected function generateCorrelationId () {
-		$this->setHeader (self::CORRELATION_ID, md5 (strval (rand (0, PHP_INT_MAX))));
+		// Add in the command
+		$frameData .= $this->getCommand ();
+		$frameData .= "\n";
+		
+		// Add in each header
+		foreach ($this->getHeaders () as $header => $value) {
+			$frameData .= $header;
+			$frameData .= ": ";
+			$frameData .= $value;
+			$frameData .= "\n";
+		}
+		
+		// Add in the payload content length
+		if ($this->getCommand () == self::Send) {
+			$frameData .= self::ContentLengthHeader;
+			$frameData .= ": ";
+			$frameData .= strlen ($this->getPayload ());
+			$frameData .= "\n";
+		}
+		
+		// Linebreak between the headers and the payload
+		$frameData .= "\n";
+		
+		// Append the payload itself
+		$frameData .= $this->getPayload ();
+		$frameData .= "\0";
+		
+		// Done.
+		return $frameData;
 	}
 	
 	/**
-	 * @return string
+	 * Enter description here...
+	 *
+	 * @return void
 	 */
-	public function getBody () {
-		return $this->body;
+	public function acknowledge () {
+		if ($this->getCommand () != self::Message)
+			return; // Only message types get acknowledged
+		
+
+		$frame = new Apache_ActiveMQ_Stomp_Frame ($this->getConnection ());
+		$frame->setCommand (self::Acknowledge);
+		
+		if ($this->getTransaction () == null)
+			$frame->setMessageId ($this->getMessageId ());
+		else
+			$frame->setTransaction ($this->getTransaction ());
+		
+		$frame->send ();
 	}
 	
 	/**
+	 * Forward this frame to the connection object for sending.
+	 *
+	 * @return void
+	 */
+	public function send () {
+		$this->getConnection ()->sendFrame ($this);
+	}
+	
+	/**
+	 * Enter description here...
+	 *
+	 * @return bool
+	 */
+	public function getAcknowledged () {
+		return $this->getHeader (self::AcknowledgedHeader) == "client";
+	}
+	
+	/**
+	 * Enter description here...
+	 *
+	 * @param bool $acknowledged
+	 * @return void
+	 */
+	public function setAcknowledged ($acknowledged) {
+		assert (is_bool ($acknowledged));
+		$this->setHeader (self::AcknowledgedHeader, $acknowledged ? "client" : "auto");
+	}
+	
+	/**
+	 * Enter description here...
+	 *
 	 * @return string
 	 */
 	public function getCommand () {
@@ -113,88 +179,240 @@ class Apache_ActiveMQ_Stomp_Frame {
 	/**
 	 * Enter description here...
 	 *
-	 * @return integer Returns 0 or greater if the header is present, -1 if missing
+	 * @param string $command
+	 * @return void
 	 */
-	public function getContentLength () {
-		$header = $this->getHeader (self::CONTENT_LENGTH);
-		return strlen ($header) ? intval ($header) : -1;
+	public function setCommand ($command) {
+		assert (is_string ($command));
+		
+		switch ($command) {
+			case self::Acknowledge :
+			case self::Connect :
+			case self::Connected :
+			case self::Disconnect :
+			case self::Error :
+			case self::Message :
+			case self::Receipt :
+			case self::Send :
+			case self::Subscribe :
+			case self::Unsubscribe :
+				$this->command = $command;
+				return;
+		}
+		
+		throw new Apache_ActiveMQ_Stomp_Exception_InvalidCommand ($command);
 	}
 	
-	/**
-	 * Enter description here...
-	 *
-	 * @return string
-	 */
+	public function getConnection () {
+		return $this->connection;
+	}
+	
+	public function setConnection (Apache_ActiveMQ_Stomp_Connection $connection) {
+		$this->connection = $connection;
+	}
+	
+	public function getConnectionId () {
+		return is_null ($this->connection) ? null : $this->connection->getId ();
+	}
+	
 	public function getCorrelationId () {
-		return $this->getHeader (self::CORRELATION_ID);
+		return $this->getHeader (self::CorrelationIdHeader);
 	}
 	
-	/**
-	 * Convert this message to a string data representation
-	 *
-	 * @return string
-	 */
-	public function getEncapsulatedData () {
-		$messageData = $this->getCommand () . "\n";
-		
-		foreach ($this->headers as $key => $value) {
-			$messageData .= $key . ": " . $value . "\n";
-		}
-		
-		$messageData .= "\n";
-		$messageData .= $this->getBody ();
-		$messageData .= self::TERMINATOR;
-		return $messageData;
+	public function setCorrelationId ($correlationId) {
+		assert (is_string ($correlationId));
+		$this->setHeader (self::CorrelationIdHeader, $correlationId);
 	}
 	
-	/**
-	 * @return string
-	 */
-	public function getHeader ($key) {
-		assert (is_string ($key));
+	public function setGeneratedCorrelationId () {
+		$this->setCorrelationId ((string) uniqid (rand (), true));
+	}
+	
+	public function getDestination () {
+		return $this->getHeader (self::DestinationHeader);
+	}
+	
+	public function setDestination ($destination) {
+		assert (is_string ($destination));
+		assert (preg_match ('/^\/(topic|queue)\/.+/', $destination));
+		$this->setHeader (self::DestinationHeader, $destination);
+	}
+	
+	public function getExpiration () {
+		$expiration = $this->getHeader (self::ExpirationHeader);
 		
-		if (isset ($this->headers [$key])) {
-			return $this->headers [$key];
-		} else {
-			return '';
-		}
+		if (is_null ($expiration) || $expiration == "0")
+			return PHP_INT_MAX;
+		else
+			return $expiration;
+	}
+	
+	public function setExpiration ($expiration) {
+		assert (is_int ($expiration) || preg_match ('/^\d+$/', $expiration));
+		$this->setHeader (self::ExpirationHeader, $expiration);
 	}
 	
 	/**
 	 * Enter description here...
 	 *
-	 * @return array
+	 * @param string $frameData
 	 */
+	public function setFrameData ($frameData) {
+		// Reset 
+		$this->command = "";
+		$this->headers = array ();
+		$this->payload = "";
+		
+		// Frame data?
+		if (is_null ($frameData))
+			return;
+			
+		// Split the headers from the payload
+		$matches = array ();
+		
+		if (preg_match ('/^(.+?\n)\n(.*)$/s', $frameData, $matches)) {
+			list (, $headers, $payload) = $matches;
+			$headers = explode ("\n", trim ($headers));
+			
+			// Extract the command and payload
+			$this->setCommand (trim (array_shift ($headers)));
+			$this->setPayload ($payload);
+			
+			// Extract the rest of the headers
+			foreach ($headers as $header) {
+				list ($name, $value) = explode (":", $header, 2);
+				$this->setHeader ($name, $value);
+			}
+		}
+	}
+	
+	public function getHeader ($header, $default = null) {
+		assert (is_string ($header));
+		
+		if (array_key_exists ($header, $this->headers))
+			return $this->headers [$header];
+		else
+			return $default;
+	}
+	
+	public function hasHeader ($header) {
+		return array_key_exists ($header, $this->headers);
+	}
+	
+	public function setHeader ($header, $value) {
+		assert (is_string ($header));
+		assert (is_string ($value));
+		$this->headers [$header] = $value;
+	}
+	
 	public function getHeaders () {
 		return $this->headers;
 	}
 	
-	/**
-	 * @param string $body
-	 */
-	public function setBody ($body) {
-		assert (is_string ($body) || is_null ($body));
-		$this->body = $body;
+	public function getId () {
+		return $this->getHeader (self::IdHeader);
 	}
 	
-	/**
-	 * @param string $command
-	 */
-	public function setCommand ($command) {
-		assert (is_string ($command));
-		$this->command = $command;
+	public function setId ($id) {
+		assert (is_string ($id));
+		$this->setHeader (self::IdHeader, $id);
 	}
 	
-	/**
-	 * Add a single header under a named key
-	 *
-	 * @param string $key
-	 * @param string $value
-	 */
-	public function setHeader ($key, $value) {
-		assert (is_string ($key));
-		assert (is_string ($value));
-		$this->headers [trim ($key)] = trim ($value);
+	public function getMessageId () {
+		return $this->getHeader (self::MessageIdHeader);
+	}
+	
+	public function setMessageId ($messageId) {
+		assert (is_string ($messageId));
+		$this->setHeader (self::MessageIdHeader, $messageId);
+	}
+	
+	public function setPassword ($password) {
+		assert (is_string ($password));
+		$this->setHeader (self::PasswordHeader, $password);
+	}
+	
+	public function getPayload () {
+		return $this->payload;
+	}
+	
+	public function setPayload ($payload) {
+		assert (is_string ($payload));
+		$this->payload = $payload;
+	}
+	
+	public function getPriority () {
+		$priority = intval ($this->getHeader (self::PriorityHeader));
+		
+		if ($priority >= self::Highest)
+			return self::Highest;
+		elseif ($priority >= self::High)
+			return self::High;
+		elseif ($priority >= self::Normal)
+			return self::Normal;
+		elseif ($priority >= self::Low)
+			return self::Low;
+		else
+			return self::Lowest;
+	}
+	
+	public function setPriority ($priority) {
+		assert (is_int ($priority));
+		
+		switch ($priority) {
+			case self::Highest :
+			case self::High :
+			case self::Normal :
+			case self::Low :
+			case self::Lowest :
+				$this->setHeader (self::PriorityHeader, strval ($priority));
+				return;
+		}
+		
+		throw new Apache_ActiveMQ_Stomp_Exception_InvalidPriority ($priority);
+	}
+	
+	public function getReceipt () {
+		if ($this->getCommand () == self::Receipt)
+			return $this->getHeader (self::ReceiptCommandHeader);
+		else
+			return $this->getHeader (self::ReceiptHeader);
+	}
+	
+	public function setReceiptRequired () {
+		$this->setHeader (self::Receipt, uniqid (rand (), true));
+	}
+	
+	public function getSelector () {
+		return $this->getHeader (self::SelectorHeader);
+	}
+	
+	public function setSelector ($selector) {
+		assert (is_string ($selector));
+		$this->setHeader (self::SelectorHeader, $selector);
+	}
+	
+	public function getSubscription () {
+		return $this->getHeader (self::SubscriptionHeader);
+	}
+	
+	public function setSubscription ($subscription) {
+		assert (is_string ($subscription));
+		$this->setHeader (self::SubscriptionHeader, $subscription);
+	}
+	
+	public function getTransaction () {
+		return $this->getHeader (self::TransactionHeader);
+	}
+	
+	public function setTransaction ($transaction) {
+		assert (is_string ($transaction));
+		$this->setHeader (self::TransactionHeader, $transaction);
+	}
+	
+	public function setUser ($user) {
+		assert (is_string ($user));
+		$this->setHeader (self::UserHeader, $user);
 	}
 
 }

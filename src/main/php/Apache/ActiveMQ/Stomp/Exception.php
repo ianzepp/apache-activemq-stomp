@@ -27,4 +27,4 @@
  * @package 
  */
 
-class Apache_ActiveMQ_Stomp_Exception_Connection extends Apache_ActiveMQ_Exception {}
+class Apache_ActiveMQ_Stomp_Exception extends Exception {}
