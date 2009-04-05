@@ -3,6 +3,8 @@
 	<id>php-lib</id>
 	<formats>
 		<format>jar</format>
+		<format>zip</format>
+		<format>tar.gz</format>
 	</formats>
 	
 	<includeBaseDirectory>false</includeBaseDirectory>

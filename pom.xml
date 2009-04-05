@@ -7,21 +7,67 @@
 	<packaging>php</packaging>
 
 	<properties>
-		<php.assembly>php-lib</php.assembly>
-		<php.compile.args></php.compile.args>
-		<php.plugin.version>1.0-BETA-2</php.plugin.version>
+		<maven-assembly-plugin.version>2.2-beta-3</maven-assembly-plugin.version>
+		<maven-assembly-plugin.assembly>php-lib</maven-assembly-plugin.assembly>
+		<maven-php-plugin.version>1.0-BETA-2</maven-php-plugin.version>
+		<maven-php-plugin.compileArgs></maven-php-plugin.compileArgs>
+		<maven-php-plugin.ignoreValidate>false</maven-php-plugin.ignoreValidate>
 		<phpunit5.version>3.2.9-BETA-1</phpunit5.version>
 	</properties>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>release-repo1.php-maven.org</id>
+			<name>PHP-Maven 2 Release Repository</name>
+			<url>http://repo1.php-maven.org/release</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+		</pluginRepository>
+		<pluginRepository>
+			<id>snapshot-repo1.php-maven.org</id>
+			<name>PHP-Maven 2 Snapshot Repository</name>
+			<url>http://repo1.php-maven.org/snapshot</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</pluginRepository>
+	</pluginRepositories>
+	<repositories>
+		<repository>
+			<id>release-repo1.php-maven.org</id>
+			<name>PHP-Maven 2 Release Repository</name>
+			<url>http://repo1.php-maven.org/release</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+		</repository>
+		<repository>
+			<id>snapshot-repo1.php-maven.org</id>
+			<name>PHP-Maven 2 Snapshot Repository</name>
+			<url>http://repo1.php-maven.org/snapshot</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
 
 	<build>
 		<plugins>
 			<plugin>
 				<groupId>org.phpmaven</groupId>
 				<artifactId>maven-php-plugin</artifactId>
-				<version>${php.plugin.version}</version>
+				<version>${maven-php-plugin.version}</version>
 				<extensions>true</extensions>
 				<configuration>
-					<compileArgs>${php.compile.args}</compileArgs>
+					<compileArgs>${maven-php-plugin.compileArgs}</compileArgs>
+					<ignoreValidate>${maven-php-plugin.ignoreValidate}</ignoreValidate>
 				</configuration>
 			</plugin>
 		</plugins>
@@ -31,12 +77,12 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-assembly-plugin</artifactId>
-					<version>2.2-beta-3</version>
+					<version>${maven-assembly-plugin.version}</version>
 					<dependencies>
 						<dependency>
 							<groupId>org.phpmaven</groupId>
 							<artifactId>maven-php-plugin</artifactId>
-							<version>${php.plugin.version}</version>
+							<version>${maven-php-plugin.version}</version>
 						</dependency>
 					</dependencies>
 					<executions>
@@ -48,7 +94,7 @@
 							</goals>
 							<configuration>
 								<descriptorRefs>
-									<descriptorRef>${php.assembly}</descriptorRef>
+									<descriptorRef>${maven-assembly-plugin.assembly}</descriptorRef>
 								</descriptorRefs>
 							</configuration>
 						</execution>
@@ -63,7 +109,7 @@
 			<plugin>
 				<groupId>org.phpmaven</groupId>
 				<artifactId>maven-php-plugin</artifactId>
-				<version>${php.plugin.version}</version>
+				<version>${maven-php-plugin.version}</version>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
