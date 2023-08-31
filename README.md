@@ -1,6 +1,6 @@
 # apache-activemq-stomp
 
-Note: project was originally written in 2008/2009, saved in Google Code until that project was shut down, and then moved to Github.
+Note: project was originally written in 2008/2009, saved in Google Code until the service was shut down, and then archived to Github.
 
 ## Overview
 
